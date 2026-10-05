@@ -1,10 +1,10 @@
-import { findByProps, findByFilePath, findByName, findByStoreName } from "@vendetta/metro";
+import { findByProps, findByName, findByStoreName } from "@vendetta/metro";
 import { after } from "@vendetta/patcher";
 import { ReactNative } from "@vendetta/metro/common";
 
 const { Pressable } = findByProps("Button", "Text", "View");
 const ProfileBanner = findByName("ProfileBanner", false);
-const HeaderAvatar = findByFilePath("modules/profile_customization/native/HeaderAvatar.tsx").default;
+const HeaderAvatar = findByName("HeaderAvatar", false);
 const { openMediaModal } = findByProps("openMediaModal");
 const { hideActionSheet } = findByProps("hideActionSheet");
 const { getChannelId } = findByStoreName("SelectedChannelStore");
@@ -40,7 +40,7 @@ async function openModal(src: string, event: any) {
             channelId: getChannelId(),
         }],
         initialIndex: 0,
-        originViewOrOriginLayout: {
+        originLayout: {
             width: 0,
             height: 0,
             x: event.pageX,
@@ -50,7 +50,7 @@ async function openModal(src: string, event: any) {
     });
 }
 
-const unpatchAvatar = after("render", HeaderAvatar, ([{ user, style, guildId }], res) => {
+const unpatchAvatar = after("default", HeaderAvatar, ([{ user, style, guildId }], res) => {
     let ext = "png";
 
     if (typeof user.guildMemberAvatars?.[guildId] === "string" &&
@@ -75,9 +75,11 @@ const unpatchAvatar = after("render", HeaderAvatar, ([{ user, style, guildId }],
     return (
         <Pressable
             onPress={({ nativeEvent }) =>
+                openModal(url, nativeEvent)
+            }
+            onLongPress={({ nativeEvent }) =>
                 guildSpecific ? openModal(guildSpecific, nativeEvent) : openModal(url, nativeEvent)
             }
-            onLongPress={({ nativeEvent }) => openModal(url, nativeEvent)}
             style={style}
         >
             {res}
@@ -85,12 +87,12 @@ const unpatchAvatar = after("render", HeaderAvatar, ([{ user, style, guildId }],
     );
 });
 
-const unpatchBanner = after("default", ProfileBanner, ([bannerHeight], res) => {
-    const bannerSource = bannerHeight?.bannerSource;
-
+const unpatchBanner = after("default", ProfileBanner, ([{ bannerSource }], res) => {
     if (typeof bannerSource?.uri !== "string" || !res) return res;
 
-    const url = `${bannerSource.uri.split("?")[0]}?size=4096`;
+    const url = bannerSource.uri
+        .replace(/(?:\\?size=\\d{3,4})?$/, "?size=4096")
+        .replace(".webp", ".png");
 
     return (
         <Pressable onPress={({ nativeEvent }) => openModal(url, nativeEvent)}>
